@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Lung Mechanics</title>
+  <style>
+    :root {
+      --navy: #163d71;
+      --blue: #1d6fc9;
+      --green: #17864a;
+      --purple: #6b3aa5;
+      --orange: #ef7d22;
+      --red: #c62828;
+      --teal: #168a96;
+      --bg: #f5f8fc;
+      --card: #ffffff;
+      --ink: #102033;
+      --muted: #5f6b7a;
+      --line: #d7e2f0;
+      --shadow: 0 10px 26px rgba(18, 57, 107, 0.1);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); }
+    header { text-align: center; padding: 28px 18px 18px; }
+    h1 { margin: 0; color: var(--navy); font-size: clamp(2rem, 4vw, 3.5rem); }
+    .subtitle { color: var(--muted); font-size: clamp(1rem, 1.7vw, 1.2rem); margin-top: 8px; }
+    .wrap { max-width: 1520px; margin: 0 auto; padding: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(260px, 1fr)); gap: 18px; }
+    @media (max-width: 1150px) { .grid { grid-template-columns: repeat(2, minmax(260px, 1fr)); } }
+    @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 535px; }
+    .card h2 { margin: 0; font-size: 1.08rem; color: var(--navy); }
+    .tagline { margin: 0; color: var(--muted); font-size: 0.92rem; min-height: 36px; }
+    .visual { position: relative; border-radius: 16px; overflow: hidden; background: linear-gradient(#fff, #f8fbff); border: 1px solid #e3ecf7; min-height: 265px; display: flex; align-items: center; justify-content: center; }
+    .visual img { width: 100%; height: auto; display: block; }
+    .overlay-badge {
+      position: absolute; z-index: 3; background: rgba(255,255,255,.94); border: 1px solid #d6e4f2; border-radius: 999px;
+      padding: 6px 10px; font-size: .86rem; font-weight: 700; box-shadow: 0 4px 10px rgba(18,57,107,.08);
+      max-width: calc(100% - 24px);
+    }
+    .overlay-badge.small { font-size: .8rem; font-weight: 600; }
+    .top-left { top: 10px; left: 10px; }
+    .top-right { top: 10px; right: 10px; }
+    .bottom-left { bottom: 10px; left: 10px; }
+    .bottom-right { bottom: 10px; right: 10px; }
+    .center-top { top: 10px; left: 50%; transform: translateX(-50%); }
+    .meter-wrap {
+      position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 2;
+      background: rgba(255,255,255,.92); border: 1px solid #d6e4f2; border-radius: 14px; padding: 8px 10px;
+    }
+    .meter-label { font-size: .78rem; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
+    .meter { height: 12px; border-radius: 999px; background: #edf3fb; overflow: hidden; border: 1px solid #d5e1ef; }
+    .meter-fill { height: 100%; border-radius: 999px; width: 50%; background: linear-gradient(90deg, var(--blue), #6bb6ff); transition: width .18s ease; }
+    .meter-fill.green { background: linear-gradient(90deg, #1f9f5a, #7ad49f); }
+    .meter-fill.purple { background: linear-gradient(90deg, #7742b2, #b493dd); }
+    .meter-fill.orange { background: linear-gradient(90deg, #ef7d22, #f7b36d); }
+    .meter-fill.red { background: linear-gradient(90deg, #d94242, #f28b8b); }
+    .controls { margin-top: auto; }
+    label { display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--navy); font-size: .9rem; margin-bottom: 6px; gap: 8px; }
+    input[type="range"] { width: 100%; accent-color: var(--blue); }
+    .readout { background: #f3f7fc; border: 1px solid #dfe9f5; border-radius: 12px; padding: 10px; margin-top: 10px; font-size: .92rem; line-height: 1.35; }
+    .formula { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; color: var(--purple); }
+    .summary { background: white; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 18px; margin: 20px 0 34px; }
+    .path { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
+    .step { border: 1px solid #dbe6f3; border-radius: 999px; padding: 9px 12px; background: #f8fbff; font-size: 0.9rem; }
+    .arrow { color: var(--muted); font-weight: 900; }
+    .hint { text-align: center; color: var(--muted); font-size: 0.9rem; margin-top: 10px; }
+    .blue{ color: var(--blue); } .green{ color: var(--green); } .purple{ color: var(--purple); } .orange{ color: var(--orange); } .red{ color: var(--red); }
+
+    /* Graph overlays */
+    .graph-zone { position: absolute; left: 18%; right: 8%; top: 38%; bottom: 25%; pointer-events: none; }
+    .graph-zone.pepGraph { left: 8%; right: 8%; top: 36%; bottom: 22%; }
+    .pleural-line { position: absolute; left: 0; right: 0; top: 57%; border-top: 3px dashed rgba(107,58,165,.85); }
+    .airway-line { position: absolute; left: 6%; top: 18%; width: 78%; height: 3px; background: #d94242; transform-origin: left center; transform: rotate(24deg); }
+    .marker-dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #ef7d22; border: 3px solid white; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+    .marker-label { position: absolute; font-size: .78rem; font-weight: 800; color: var(--navy); background: rgba(255,255,255,.9); padding: 2px 6px; border-radius: 8px; border: 1px solid #dde8f4; transform: translate(-50%, -120%); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Physics of Breathing</h1>
+    <div class="subtitle">Infographic-style interactive activities for pressure, flow, resistance, EPP and PEP.</div>
+  </header>
+
+  <main class="wrap">
+    <section class="grid">
+      <article class="card">
+        <h2>1. Boyle’s Law</h2>
+        <p class="tagline">As alveolar volume increases, alveolar pressure falls.</p>
+        <div class="visual">
+          <img src="assets/boyle.png" alt="Boyle's law lungs under bell jars" />
+          <div class="overlay-badge top-left" id="boyleBadge">Volume 100%</div>
+          <div class="overlay-badge top-right" id="boylePressure">Pressure 0.0 cmH₂O</div>
+          <div class="meter-wrap">
+            <div class="meter-label">Relative lung expansion</div>
+            <div class="meter"><div class="meter-fill" id="boyleFill"></div></div>
+          </div>
+        </div>
+        <div class="controls">
+          <label>Alveolar volume <span id="boyleVal">100%</span></label>
+          <input id="boyle" type="range" min="70" max="150" value="100" />
+          <div class="readout" id="boyleText"></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>2. Pascal’s Law</h2>
+        <p class="tagline">Pressure applied at one point is transmitted through the connected gas column.</p>
+        <div class="visual">
+          <img src="assets/pascal.png" alt="Pascal's law lungs with pressure arrows" />
+          <div class="overlay-badge top-left" id="pascalBadge">PEP 10 cmH₂O</div>
+          <div class="overlay-badge top-right small" id="pascalSpread">Pressure transmitted through the airways</div>
+          <div class="meter-wrap">
+            <div class="meter-label">Applied mouth pressure</div>
+            <div class="meter"><div class="meter-fill green" id="pascalFill"></div></div>
+          </div>
+        </div>
+        <div class="controls">
+          <label>PEP mouth pressure <span id="pascalVal">10 cmH₂O</span></label>
+          <input id="pascal" type="range" min="0" max="20" value="10" />
+          <div class="readout" id="pascalText"></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>3. Poiseuille’s Law</h2>
+        <p class="tagline">Resistance rises sharply when airway radius narrows.</p>
+        <div class="visual">
+          <img src="assets/poiseuille.png" alt="Poiseuille's law airway cross-sections" />
+          <div class="overlay-badge top-left" id="poiseuilleBadge">Radius 1.5 mm</div>
+          <div class="overlay-badge top-right" id="poiseuilleResistance">Resistance 1.0</div>
+          <div class="meter-wrap">
+            <div class="meter-label">Relative airway narrowing</div>
+            <div class="meter"><div class="meter-fill purple" id="poiseuilleFill"></div></div>
+          </div>
+        </div>
+        <div class="controls">
+          <label>Airway radius <span id="poiseuilleVal">1.5 mm</span></label>
+          <input id="poiseuille" type="range" min="5" max="25" value="15" />
+          <div class="readout" id="poiseuilleText"></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>4. Continuity Equation</h2>
+        <p class="tagline">Same flow spread across more total area means lower average velocity.</p>
+        <div class="visual">
+          <img src="assets/continuity.png" alt="Continuity equation large and small airway illustrations" />
+          <div class="overlay-badge top-left" id="continuityBadge">Area 50 cm²</div>
+          <div class="overlay-badge top-right" id="continuityVelocity">Velocity 5.0 cm/s</div>
+          <div class="meter-wrap">
+            <div class="meter-label">Total cross-sectional area</div>
+            <div class="meter"><div class="meter-fill orange" id="continuityFill"></div></div>
+          </div>
+        </div>
+        <div class="controls">
+          <label>Total cross-sectional area <span id="continuityVal">50 cm²</span></label>
+          <input id="continuity" type="range" min="5" max="160" value="50" />
+          <div class="readout" id="continuityText"></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>5. Parallel Airways</h2>
+        <p class="tagline">Many small airways in parallel reduce total resistance.</p>
+        <div class="visual">
+          <img src="assets/parallel.png" alt="Parallel airways branching illustration" />
+          <div class="overlay-badge top-left" id="parallelBadge">Open airways 32</div>
+          <div class="overlay-badge top-right" id="parallelResistance">Total resistance 0.50</div>
+          <div class="meter-wrap">
+            <div class="meter-label">Number of functioning parallel pathways</div>
+            <div class="meter"><div class="meter-fill blue" id="parallelFill"></div></div>
+          </div>
+        </div>
+        <div class="controls">
+          <label>Open parallel airways <span id="parallelVal">32</span></label>
+          <input id="parallel" type="range" min="1" max="64" value="32" />
+          <div class="readout" id="parallelText"></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>6. Bernoulli Effect</h2>
+        <p class="tagline">In a local narrowing, flow speeds up and static pressure falls.</p>
+        <div class="visual">
+          <img src="assets/bernoulli.png" alt="Bernoulli effect in a narrowed airway" />
+          <div class="overlay-badge top-left" id="bernoulliBadge">Narrowing 40%</div>
+          <div class="overlay-badge top-right" id="bernoulliVelocity">Velocity 16.7</div>
+          <div class="meter-wrap">
+            <div class="meter-label">Degree of local narrowing</div>
+            <div class="meter"><div class="meter-fill orange" id="bernoulliFill"></div></div>
+          </div>
+        </div>
+        <div class="controls">
+          <label>Local airway narrowing <span id="bernoulliVal">40%</span></label>
+          <input id="bernoulli" type="range" min="0" max="85" value="40" />
+          <div class="readout" id="bernoulliText"></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>7. Equal Pressure Point</h2>
+        <p class="tagline">The EPP is where airway pressure equals pleural pressure.</p>
+        <div class="visual">
+          <img src="assets/epp.png" alt="Equal pressure point graph" />
+          <div class="overlay-badge top-left" id="eppBadge">P pleura +8 cmH₂O</div>
+          <div class="overlay-badge top-right small">Move the slider and watch the EPP shift</div>
+          <div class="graph-zone" id="eppGraph">
+            <div class="marker-dot" id="eppDot"></div>
+            <div class="marker-label" id="eppLabel">EPP</div>
+          </div>
+          <div class="meter-wrap">
+            <div class="meter-label">Pleural pressure</div>
+            <div class="meter"><div class="meter-fill red" id="eppFill"></div></div>
+          </div>
+        </div>
+        <div class="controls">
+          <label>P pleura <span id="eppVal">+8 cmH₂O</span></label>
+          <input id="epp" type="range" min="-5" max="20" value="8" />
+          <div class="readout" id="eppText"></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>8. Positive Expiratory Pressure</h2>
+        <p class="tagline">PEP raises airway pressure and shifts the EPP toward the mouth.</p>
+        <div class="visual">
+          <img src="assets/pep.png" alt="Positive expiratory pressure graph" />
+          <div class="overlay-badge top-left" id="pepBadge">PEP 10 cmH₂O</div>
+          <div class="overlay-badge top-right small">Higher airway pressure = less small-airway collapse</div>
+          <div class="graph-zone pepGraph" id="pepGraph">
+            <div class="marker-dot" id="pepDot"></div>
+            <div class="marker-label" id="pepLabel">EPP</div>
+          </div>
+          <div class="meter-wrap">
+            <div class="meter-label">Applied PEP level</div>
+            <div class="meter"><div class="meter-fill teal" id="pepFill" style="background:linear-gradient(90deg,#168a96,#71d6dd)"></div></div>
+          </div>
+        </div>
+        <div class="controls">
+          <label>PEP level <span id="pepVal">10 cmH₂O</span></label>
+          <input id="pep" type="range" min="0" max="20" value="10" />
+          <div class="readout" id="pepText"></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="summary">
+      <div class="path">
+        <span class="step">Muscle contraction changes thoracic volume</span><span class="arrow">→</span>
+        <span class="step">Boyle: volume changes pressure</span><span class="arrow">→</span>
+        <span class="step">Pascal: pressure is transmitted</span><span class="arrow">→</span>
+        <span class="step">Pressure gradient drives flow</span><span class="arrow">→</span>
+        <span class="step">Poiseuille: resistance causes pressure loss</span><span class="arrow">→</span>
+        <span class="step">EPP: P airway = P pleura</span><span class="arrow">→</span>
+        <span class="step">PEP shifts the EPP toward the mouth</span>
+      </div>
+      <div class="hint">Teaching tip: ask students which sliders mainly change pressure generation, resistance, velocity, or airway stability.</div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+    const fmtSigned = (n) => (n >= 0 ? '+' : '') + n;
+
+    function setFill(id, pct){ $(id).style.width = clamp(pct,0,100) + '%'; }
+
+    function renderBoyle(){
+      const v = +$('boyle').value;
+      const p = -((v - 100) / 20);
+      $('boyleVal').textContent = v + '%';
+      $('boyleBadge').textContent = 'Volume ' + v + '%';
+      $('boylePressure').textContent = 'Pressure ' + (p >= 0 ? '+' : '') + p.toFixed(1) + ' cmH₂O';
+      setFill('boyleFill', (v - 70) / 80 * 100);
+      $('boyleText').innerHTML = `<span class="formula">Boyle’s law: ↑ volume → ↓ pressure</span><br>At <b>${v}%</b> relative alveolar volume, the model estimates alveolar pressure at about <b>${fmtSigned(p.toFixed(1))} cmH₂O</b>. More negative pressure helps draw air in.`;
+    }
+
+    function renderPascal(){
+      const p = +$('pascal').value;
+      $('pascalVal').textContent = p + ' cmH₂O';
+      $('pascalBadge').textContent = 'PEP ' + p + ' cmH₂O';
+      $('pascalSpread').textContent = p === 0 ? 'No added mouth pressure' : 'Pressure transmitted through the airways';
+      setFill('pascalFill', p / 20 * 100);
+      $('pascalText').innerHTML = `Applying <b>${p} cmH₂O</b> at the mouth raises pressure in the connected airway system. In respiratory mechanics, this helps explain how PEP acts beyond the lips.`;
+    }
+
+    function renderPoiseuille(){
+      const r = +$('poiseuille').value / 10;
+      const R = 5.06 / Math.pow(r, 4);
+      $('poiseuilleVal').textContent = r.toFixed(1) + ' mm';
+      $('poiseuilleBadge').textContent = 'Radius ' + r.toFixed(1) + ' mm';
+      $('poiseuilleResistance').textContent = 'Resistance ' + R.toFixed(1);
+      setFill('poiseuilleFill', (25 - $('poiseuille').value) / 20 * 100);
+      $('poiseuilleText').innerHTML = `<span class="formula">Resistance ∝ 1 / radius⁴</span><br>With an airway radius of <b>${r.toFixed(1)} mm</b>, the relative resistance is about <b>${R.toFixed(1)}</b>. Even small radius changes have large effects.`;
+    }
+
+    function renderContinuity(){
+      const A = +$('continuity').value;
+      const velocity = 250 / A;
+      $('continuityVal').textContent = A + ' cm²';
+      $('continuityBadge').textContent = 'Area ' + A + ' cm²';
+      $('continuityVelocity').textContent = 'Velocity ' + velocity.toFixed(1) + ' cm/s';
+      setFill('continuityFill', (A - 5) / 155 * 100);
+      $('continuityText').innerHTML = `<span class="formula">Flow = velocity × area</span><br>If total cross-sectional area increases to <b>${A} cm²</b>, average airflow velocity falls to about <b>${velocity.toFixed(1)} cm/s</b> for the same total flow.`;
+    }
+
+    function renderParallel(){
+      const n = +$('parallel').value;
+      const Rt = 16 / n;
+      $('parallelVal').textContent = n;
+      $('parallelBadge').textContent = 'Open airways ' + n;
+      $('parallelResistance').textContent = 'Total resistance ' + Rt.toFixed(2);
+      setFill('parallelFill', n / 64 * 100);
+      $('parallelText').innerHTML = `Each small airway may be resistive, but <b>${n}</b> functioning pathways in parallel reduce total resistance to about <b>${Rt.toFixed(2)}</b>. This is why healthy peripheral airways contribute relatively little total resistance.`;
+    }
+
+    function renderBernoulli(){
+      const nar = +$('bernoulli').value;
+      const frac = nar / 100;
+      const velocity = 10 / (1 - frac || 1);
+      const drop = -((velocity - 10) / 6);
+      $('bernoulliVal').textContent = nar + '%';
+      $('bernoulliBadge').textContent = 'Narrowing ' + nar + '%';
+      $('bernoulliVelocity').textContent = 'Velocity ' + velocity.toFixed(1);
+      setFill('bernoulliFill', nar / 85 * 100);
+      $('bernoulliText').innerHTML = `At <b>${nar}%</b> local narrowing, velocity rises to about <b>${velocity.toFixed(1)}</b> relative units, and local static pressure falls by about <b>${drop.toFixed(1)} cmH₂O</b>. Bernoulli matters most within a narrowed airway segment.`;
+    }
+
+    function renderEpp(){
+      const pp = +$('epp').value;
+      const xPct = clamp(((pp + 5) / 25) * 75 + 8, 8, 90); // more positive pleural pressure → more peripheral (left)
+      const yPct = 57;
+      $('eppVal').textContent = fmtSigned(pp) + ' cmH₂O';
+      $('eppBadge').textContent = 'P pleura ' + fmtSigned(pp) + ' cmH₂O';
+      setFill('eppFill', (pp + 5) / 25 * 100);
+      $('eppDot').style.left = xPct + '%';
+      $('eppDot').style.top = yPct + '%';
+      $('eppLabel').style.left = xPct + '%';
+      $('eppLabel').style.top = (yPct - 5) + '%';
+      $('eppText').innerHTML = `The Equal Pressure Point is where <b>P airway = P pleura</b>. At <b>${fmtSigned(pp)} cmH₂O</b> pleural pressure, the EPP shifts ${pp > 8 ? '<b>more peripherally</b>' : pp < 8 ? '<b>more centrally</b>' : '<b>to the mid-airway</b>'}. Beyond the EPP, airway narrowing or collapse can occur.`;
+    }
+
+    function renderPep(){
+      const pep = +$('pep').value;
+      const xPct = clamp(34 + pep * 2.4, 34, 86); // more PEP → more to mouth (right)
+      const yPct = 57;
+      $('pepVal').textContent = pep + ' cmH₂O';
+      $('pepBadge').textContent = 'PEP ' + pep + ' cmH₂O';
+      setFill('pepFill', pep / 20 * 100);
+      $('pepDot').style.left = xPct + '%';
+      $('pepDot').style.top = yPct + '%';
+      $('pepLabel').style.left = xPct + '%';
+      $('pepLabel').style.top = (yPct - 5) + '%';
+      $('pepText').innerHTML = `With <b>${pep} cmH₂O</b> PEP, airway pressure stays higher along the airway. This shifts the EPP <b>toward the mouth</b>, reducing premature small-airway collapse and helping mucus clearance.`;
+    }
+
+    function renderAll(){
+      renderBoyle();
+      renderPascal();
+      renderPoiseuille();
+      renderContinuity();
+      renderParallel();
+      renderBernoulli();
+      renderEpp();
+      renderPep();
+    }
+
+    ['boyle','pascal','poiseuille','continuity','parallel','bernoulli','epp','pep'].forEach(id => $(id).addEventListener('input', renderAll));
+    renderAll();
+  </script>
+</body>
+</html>
